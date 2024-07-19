@@ -2,13 +2,10 @@ import requests
 import json
 import time
 from confluent_kafka import Producer
-
-# 앱 등록 후 발급받은 키
-app_key = "PS6x0bG79mb4K6QNMIk51XQPxDj4LtMXf2io"
-app_secret = "ZuLEcN/qYEN7qguwuulWuEdccHZEk0X3s3hetbdN202X4CkcWY+Swip6YC7YGgFWCRQbpZk7ApZtXsLqGsCbHBQ+LAJkzF5eCsl6GQob4V7XLLzcg41AVcVSRhhIN4+ftX7l5neUFgowfdKlugFMzdhAtkIPfi7Z2hsdYLLrUk3qxZ8c268="
+import secrets
 
 # 토큰 발급 URL
-token_url = "https://openapivts.koreainvestment.com:29443/oauth2/token"
+token_url = "https://openapivts.koreainvestment.com:29443/oauth2/tokenP"
 
 # OAuth 인증을 위한 헤더와 데이터
 headers = {
@@ -16,18 +13,18 @@ headers = {
 }
 data = {
     "grant_type": "client_credentials",
-    "appkey": app_key,
-    "appsecret": app_secret
+    "appkey": secrets.app_key,
+    "appsecret": secrets.app_secret
 }
 
 # 토큰 요청
-response = requests.post(token_url, headers=headers, data=data)
+response = requests.post(token_url, data=data)
 if response.status_code == 200:
     token_info = response.json()
     access_token = token_info['access_token']
-    print("Access Token: ", access_token)
 else:
     print("Failed to obtain access token: ", response.status_code, response.text)
+    time.sleep(1000)
     exit()
 
 # Kafka 프로듀서 설정
@@ -46,8 +43,8 @@ def fetch_and_send_stock_prices():
     headers = {
         "Content-Type": "application/json",
         "authorization": f"Bearer {access_token}",
-        "appKey": app_key,
-        "appSecret": app_secret,
+        "appKey": secrets.app_key,
+        "appSecret": secrets.app_secret,
         "tr_id": "FHKST01010100"
     }
     # 여러 종목을 설정
@@ -90,6 +87,6 @@ def fetch_and_send_stock_prices():
             else:
                 print("API 호출 실패: ", response.status_code, response.text)
         producer.flush()
-        time.sleep(1)  # 1분 간격으로 데이터 수집
+        time.sleep(1)
 
 fetch_and_send_stock_prices()
