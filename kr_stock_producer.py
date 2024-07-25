@@ -4,51 +4,8 @@ import time
 from confluent_kafka import Producer
 import secrets_key
 
-# 토큰 발급 URL
-token_url = "https://openapivts.koreainvestment.com:29443/oauth2/token"
-
-# OAuth 인증을 위한 헤더와 데이터
-headers = {
-    "Content-Type": "application/x-www-form-urlencoded"
-}
-data = {
-    "grant_type": "client_credentials",
-    "appkey": secrets_key.app_key,
-    "appsecret": secrets_key.app_secret
-}
-
-# 토큰 요청
-response = requests.post(token_url, data=data)
-if response.status_code == 200:
-    token_info = response.json()
-    access_token = token_info['access_token']
-else:
-    print("Failed to obtain access token: ", response.status_code, response.text)
-    time.sleep(1000)
-    exit()
-
-# Kafka 프로듀서 설정
-producer = Producer({'bootstrap.servers': 'localhost:9092'})
-
-def delivery_report(err, msg):
-    """메시지 전달 보고 콜백 함수"""
-    if err is not None:
-        print('Message delivery failed: {}'.format(err))
-    else:
-        print('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
-
-def fetch_and_send_stock_prices():
-    """주식 가격 데이터를 가져와 Kafka로 전송"""
-    api_url = "https://openapivts.koreainvestment.com:29443/uapi/domestic-stock/v1/quotations/inquire-price"
-    headers = {
-        "Content-Type": "application/json",
-        "authorization": f"Bearer {access_token}",
-        "appKey": secrets_key.app_key,
-        "appSecret": secrets_key.app_secret,
-        "tr_id": "FHKST01010100"
-    }
     # 여러 종목을 설정
-    stock_dict = {
+stock_dict = {
     "005930": "삼성전자",
     "005935": "삼성전자우",
     "000660": "SK하이닉스",
@@ -151,6 +108,46 @@ def fetch_and_send_stock_prices():
     "032640": "LG유플러스"
 }
 
+# 토큰 발급 URL
+token_url = "https://openapivts.koreainvestment.com:29443/oauth2/token"
+
+data = {
+    "grant_type": "client_credentials",
+    "appkey": secrets_key.app_key,
+    "appsecret": secrets_key.app_secret
+}
+
+# 토큰 요청
+response = requests.post(token_url, data=data)
+if response.status_code == 200:
+    token_info = response.json()
+    access_token = token_info['access_token']
+else:
+    print("Failed to obtain access token: ", response.status_code, response.text)
+    time.sleep(1000)
+    exit()
+
+headers2 = {
+        "Content-Type": "application/json",
+        "authorization": f"Bearer {access_token}",
+        "appKey": secrets_key.app_key,
+        "appSecret": secrets_key.app_secret,
+        "tr_id": "FHKST01010100"
+    }
+
+# Kafka 프로듀서 설정
+producer = Producer({'bootstrap.servers': 'localhost:9092'})
+
+def delivery_report(err, msg):
+    """메시지 전달 보고 콜백 함수"""
+    if err is not None:
+        print('Message delivery failed: {}'.format(err))
+    else:
+        print('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
+
+def fetch_and_send_stock_prices():
+    """주식 가격 데이터를 가져와 Kafka로 전송"""
+    api_url = "https://openapivts.koreainvestment.com:29443/uapi/domestic-stock/v1/quotations/inquire-price"
 
     while True:
         for symbol, name in stock_dict.items():
@@ -159,7 +156,7 @@ def fetch_and_send_stock_prices():
                 "fid_cond_mrkt_div_code": "J",
                 "fid_input_iscd": symbol
             }
-            response = requests.get(api_url, headers=headers, params=params)
+            response = requests.get(api_url, headers=headers2, params=params)
             if response.status_code == 200:
                 data = response.json()
                 timestamp = int(time.time())
@@ -181,6 +178,8 @@ def fetch_and_send_stock_prices():
             else:
                 print("API 호출 실패: ", response.status_code, response.text)
         producer.flush()
-        time.sleep(1)
 
-fetch_and_send_stock_prices()
+while True:
+    fetch_and_send_stock_prices()
+    print("One cycle done.")
+    time.sleep(1)
