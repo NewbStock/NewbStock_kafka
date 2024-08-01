@@ -149,37 +149,36 @@ def fetch_and_send_stock_prices():
     """주식 가격 데이터를 가져와 Kafka로 전송"""
     api_url = "https://openapivts.koreainvestment.com:29443/uapi/domestic-stock/v1/quotations/inquire-price"
 
-    while True:
-        for symbol, name in stock_dict.items():
-            time.sleep(0.5)
-            params = {
-                "fid_cond_mrkt_div_code": "J",
-                "fid_input_iscd": symbol
+    for symbol, name in stock_dict.items():
+        time.sleep(0.5)
+        params = {
+            "fid_cond_mrkt_div_code": "J",
+            "fid_input_iscd": symbol
+        }
+        response = requests.get(api_url, headers=headers2, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            timestamp = int(time.time())
+            low_price = float(data['output']['stck_lwpr'])
+            high_price = float(data['output']['stck_hgpr'])
+            percent = 0 if low_price == 0 or high_price == 0 else low_price / high_price
+            stock_data = {
+                'country': "KR",
+                'symbol': symbol,
+                'name': name,
+                'sector' : data['output'].get('bstp_kor_isnm', 'Unknown'),
+                'price': data['output']['stck_prpr'],
+                'percent': percent,
+                'stck_hgpr': high_price,
+                'stck_lwpr': low_price,
+                'timestamp': timestamp
             }
-            response = requests.get(api_url, headers=headers2, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                timestamp = int(time.time())
-                low_price = float(data['output']['stck_lwpr'])
-                high_price = float(data['output']['stck_hgpr'])
-                percent = 0 if low_price == 0 or high_price == 0 else low_price / high_price
-                stock_data = {
-                    'country': "KR",
-                    'symbol': symbol,
-                    'name': name,
-                    'sector' : data['output'].get('bstp_kor_isnm', 'Unknown'),
-                    'price': data['output']['stck_prpr'],
-                    'percent': percent,
-                    'stck_hgpr': high_price,
-                    'stck_lwpr': low_price,
-                    'timestamp': timestamp
-                }
-                producer.produce('stock-prices', key=stock_data['symbol'], value=json.dumps(stock_data), callback=delivery_report)
-            else:
-                print("API 호출 실패: ", response.status_code, response.text)
-        producer.flush()
+            producer.produce('stock-prices', key=stock_data['symbol'], value=json.dumps(stock_data), callback=delivery_report)
+        else:
+            print("API 호출 실패: ", response.status_code, response.text)
+    producer.flush()
 
 while True:
     fetch_and_send_stock_prices()
-    print("One cycle done.")
+    print("[kr_stock_producer]: One cycle done.")
     time.sleep(1)

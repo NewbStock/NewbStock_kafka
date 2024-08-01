@@ -2,6 +2,7 @@ from confluent_kafka import Consumer, KafkaException, KafkaError
 import json
 import os
 import csv
+import time
 
 # Kafka 컨슈머 설정
 consumer = Consumer({
@@ -70,8 +71,7 @@ def process_messages():
                         writer.writerows(rows)
     except KeyboardInterrupt:
         pass
-    finally:
-        # 종료 시 정리
-        consumer.close()
-
-process_messages()
+while True:
+    process_messages()
+    print("[stock_target_consumer]: Restart in five seconds")
+    time.sleep(5)

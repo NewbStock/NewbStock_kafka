@@ -35,6 +35,7 @@ try:
     while True:
         msg = consumer.poll(timeout=1.0)
         if msg is None:
+            time.sleep(10)
             continue
         if msg.error():
             if msg.error().code() == KafkaError._PARTITION_EOF:

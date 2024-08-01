@@ -2,6 +2,9 @@ from confluent_kafka import Consumer, KafkaException, KafkaError
 import json
 import pandas as pd
 import os
+import time
+import boto3
+import secrets_key
 
 # Kafka Consumer 설정
 consumer_conf = {
@@ -24,6 +27,12 @@ KR_done_folder = "KR_done"
 os.makedirs(EN_done_folder, exist_ok=True)
 os.makedirs(KR_done_folder, exist_ok=True)
 
+session = boto3.Session(
+    aws_access_key_id=secrets_key.aws_access_key_id,
+    aws_secret_access_key=secrets_key.aws_secret_access_key
+)
+s3 = session.client('s3')
+
 def save_to_csv(file_name, records):
     df = pd.DataFrame(records)
     if file_name.startswith('EN_'):
@@ -35,24 +44,43 @@ def save_to_csv(file_name, records):
         return
     df.to_csv(file_path, index=False, header=False)
 
+def upload_to_s3(folder_path, s3_bucket_name):
+    for file_name in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, file_name)
+        s3_key = f"{folder_path}/{file_name}"
+        try:
+            s3.upload_file(file_path, s3_bucket_name, s3_key)
+            print(f"Uploaded {file_name} to s3://{s3_bucket_name}/{s3_key}")
+        except Exception as e:
+            print(f"Failed to upload {file_name} to S3: {e}")
+
 def consume_messages():
     try:
         while True:
             msg = consumer.poll(timeout=1.0)
             if msg is None:
+                time.sleep(60)
                 continue
             if msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     continue
                 else:
                     raise KafkaException(msg.error())
+            
             # 메시지 수신 및 출력
-            message = json.loads(msg.value().decode('utf-8'))
-            for file_name, records in message.items():
-                print(f"File: {file_name}")
-                save_to_csv(file_name, records)
-                for record in records:
-                    print(json.dumps(record, ensure_ascii=False, indent=4))
+            message_value = msg.value().decode('utf-8')
+            
+            if message_value == "upload":
+                upload_to_s3(EN_done_folder, secrets_key.s3_bucket_name)
+                upload_to_s3(KR_done_folder, secrets_key.s3_bucket_name)
+            else:
+                message = json.loads(message_value)
+                print("data received")
+                for file_name, records in message.items():
+                    print(f"File: {file_name}")
+                    save_to_csv(file_name, records)
+                    for record in records:
+                        print(json.dumps(record, ensure_ascii=False, indent=4))
     except KeyboardInterrupt:
         pass
     finally:

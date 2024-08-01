@@ -8,23 +8,21 @@ import time
 producer = Producer({'bootstrap.servers': 'localhost:9092'})
 
 while True:
-
     # 첫 번째 CSV 파일 읽기
     csv_file_1 = 'Target Stock List_EN.csv'
-    if not os.path.exists(csv_file_1):
-        time.sleep(10)
-        continue
-    df1 = pd.read_csv(csv_file_1, encoding='utf-8', header=None)
+    if os.path.exists(csv_file_1):
+        df1 = pd.read_csv(csv_file_1, encoding='utf-8', header=None)
+        df1.columns = ['country', 'ticker', 'name', 'percent', 'time']
+    else:
+        df1 = pd.DataFrame(columns=['country', 'ticker', 'name', 'percent', 'time'])
 
     # 두 번째 CSV 파일 읽기
     csv_file_2 = 'Target Stock List_KR.csv'
-    if not os.path.exists(csv_file_2):
-        time.sleep(10)
-        continue
-    df2 = pd.read_csv(csv_file_2, encoding='utf-8', header=None)
-
-    df1.columns = ['country', 'ticker', 'name', 'percent', 'time']
-    df2.columns = ['country', 'ticker', 'name', 'percent', 'time']
+    if os.path.exists(csv_file_2):
+        df2 = pd.read_csv(csv_file_2, encoding='utf-8', header=None)
+        df2.columns = ['country', 'ticker', 'name', 'percent', 'time']
+    else:
+        df2 = pd.DataFrame(columns=['country', 'ticker', 'name', 'percent', 'time'])
 
     # 두 데이터프레임 합치기
     df_combined = pd.concat([df1, df2], ignore_index=True)
@@ -49,3 +47,4 @@ while True:
 
     # 프로듀서 플러시
     producer.flush()
+    time.sleep(600)

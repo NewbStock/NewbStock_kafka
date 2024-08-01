@@ -198,7 +198,8 @@ def fetch_and_send_stock_prices():
         else:
             print("API 호출 실패: ", response.status_code, response.text)
     producer.flush()
+    
 while True:
     fetch_and_send_stock_prices()
-    print("One cycle done.")
+    print("[en_stock_producer]: One cycle done.")
     time.sleep(1)
